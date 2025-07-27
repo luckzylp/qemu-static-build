@@ -39,17 +39,19 @@ jobs:
           repository: qemu/qemu    # Source repository
           ref: v10.0.3             # Specific version tag
           path: qemu-src           # Directory to clone into
+          
+      # 3. Get QEMU Patch code
+      - name: Checkout QEMU v10.0.3 patch
+        uses: actions/checkout@v4  # Official GitHub checkout action
+        with:
+          path: qemu-patch           # Directory to clone into
 
-      # 3. Apply custom patch for ARM Cortex-A5 support
+      # 4. Apply custom patch for ARM Cortex-A5 support
       - name: Apply ARM Cortex-A5 support patch
         run: |
           cd qemu-src
-          ls ./
-          ls ../
-          ls ../../
-          ls ${{ github.workspace }}
           # Apply patch from repository's patches directory, clone path is ./qemu-static-build/qemu-src
-          git apply ${{ github.workspace }}/patches/qemu_v10.0.3_patch_cortex-a5.patch
+          git apply ../qemu-patch/patches/qemu_v10.0.3_patch_cortex-a5.patch
         env:
           PATCH_FILE: "patches/qemu_v10.0.3_patch_cortex-a5.patch"  # Patch location
         # Optional: Add these steps for pre-application validation
@@ -57,7 +59,7 @@ jobs:
         #   - name: Apply verified patch
         #     run: git apply $PATCH_FILE
 
-      # 4. Configure build parameters for static compilation
+      # 5. Configure build parameters for static compilation
       - name: Configure static build
         run: |
           cd qemu-src
@@ -74,14 +76,14 @@ jobs:
             --disable-docs \
             --target-list="$(./scripts/list-target-arches.py | xargs)"
 
-      # 5. Compile QEMU binaries
+      # 6. Compile QEMU binaries
       - name: Compile QEMU
         run: |
           cd qemu-src
           # Parallel build using all available CPU cores
           make -j$(nproc)
 
-      # 6. Prepare build artifacts for release
+      # 7. Prepare build artifacts for release
       - name: Prepare artifacts
         run: |
           # Create output directory
@@ -98,20 +100,20 @@ jobs:
           cd qemu-static-bin
           sha256sum * > SHA256SUMS
 
-      # 7. Checkout current repository for release operations
+      # 8. Checkout current repository for release operations
       - name: Checkout current repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Get full commit history for tagging
 
-      # 8. Configure Git identity for release operations
+      # 9. Configure Git identity for release operations
       - name: Configure Git
         run: |
           # Set identity for automated commits/tags
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      # 9. Install GitHub CLI for release management
+      # 10. Install GitHub CLI for release management
       - name: Install GitHub CLI
         run: |
           # Add official GitHub CLI repository
@@ -122,13 +124,13 @@ jobs:
           apt update
           apt install -y gh
 
-      # 10. Authenticate with GitHub API
+      # 11. Authenticate with GitHub API
       - name: Authenticate gh CLI
         run: |
           # Use repository token for authentication
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
-      # 11. Create GitHub release with artifacts
+      # 12. Create GitHub release with artifacts
       - name: Create GitHub release
         run: |
           # Generate unique tag name using workflow run ID
