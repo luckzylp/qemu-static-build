@@ -24,6 +24,7 @@ jobs:
       - name: Install build dependencies
         run: |
           apt-get update
+          export DEBIAN_FRONTEND=noninteractive
           apt-get install -y \
             git build-essential ninja-build \
             pkg-config libglib2.0-dev libpixman-1-dev \
