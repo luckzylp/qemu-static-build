@@ -44,8 +44,12 @@ jobs:
       - name: Apply ARM Cortex-A5 support patch
         run: |
           cd qemu-src
-          # Apply patch from repository's patches directory, clone path is `./qemu-static-build/qemu-src`
-          git apply ../../patches/qemu_v10.0.3_patch_cortex-a5.patch
+          ls -R ..
+          ls -R ../..
+          ls -R ./
+          ls -R ${{ github.workspace }}
+          # Apply patch from repository's patches directory, clone path is ./qemu-static-build/qemu-src
+          git apply ${{ github.workspace }}/patches/qemu_v10.0.3_patch_cortex-a5.patch
         env:
           PATCH_FILE: "patches/qemu_v10.0.3_patch_cortex-a5.patch"  # Patch location
         # Optional: Add these steps for pre-application validation
