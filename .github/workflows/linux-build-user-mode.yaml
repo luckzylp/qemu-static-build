@@ -44,10 +44,11 @@ jobs:
       - name: Apply ARM Cortex-A5 support patch
         run: |
           cd qemu-src
+          ls -R ..
           # Apply patch from repository's patches directory
-          git apply ../patches/qemu_v10.03_patch_cortex-a5.patch
+          git apply ../patches/qemu_v10.0.3_patch_cortex-a5.patch
         env:
-          PATCH_FILE: "patches/qemu_v10.03_patch_cortex-a5.patch"  # Patch location
+          PATCH_FILE: "patches/qemu_v10.0.3_patch_cortex-a5.patch"  # Patch location
         # Optional: Add these steps for pre-application validation
         #   - run: git apply --check $PATCH_FILE  # Test patch without applying
         #   - name: Apply verified patch
