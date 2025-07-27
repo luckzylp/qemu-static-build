@@ -1,0 +1,188 @@
+name: Build Static QEMU User-Mode Binaries (v10.0.3)
+
+on:
+  workflow_dispatch:  # Only allow manual triggering via GitHub UI
+
+jobs:
+  build-static-qemu:
+    # Use Ubuntu 20.04 container environment
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04  # Specific OS version for build consistency
+      options: --user root  # Run as root for package installation
+
+    # Required permissions for creating releases and tags
+    permissions:
+      contents: write  # Enables creating tags and releases
+
+    # Continue other jobs if one fails
+    strategy:
+      fail-fast: false
+
+    steps:
+      # 1. Install essential build tools and libraries
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            git build-essential ninja-build \
+            pkg-config libglib2.0-dev libpixman-1-dev \
+            zlib1g-dev libfdt-dev libslirp-dev \
+            libaio-dev libcap-ng-dev \
+            python3-setuptools curl  # curl needed for GitHub CLI install
+
+      # 2. Get QEMU source code
+      - name: Checkout QEMU v10.0.3
+        uses: actions/checkout@v4  # Official GitHub checkout action
+        with:
+          repository: qemu/qemu    # Source repository
+          ref: v10.0.3             # Specific version tag
+          path: qemu-src           # Directory to clone into
+
+      # 3. Apply custom patch for ARM Cortex-A5 support
+      - name: Apply ARM Cortex-A5 support patch
+        run: |
+          cd qemu-src
+          # Apply patch from repository's patches directory
+          git apply ../patches/qemu_v10.03_patch_cortex-a5.patch
+        env:
+          PATCH_FILE: "patches/qemu_v10.03_patch_cortex-a5.patch"  # Patch location
+        # Optional: Add these steps for pre-application validation
+        #   - run: git apply --check $PATCH_FILE  # Test patch without applying
+        #   - name: Apply verified patch
+        #     run: git apply $PATCH_FILE
+
+      # 4. Configure build parameters for static compilation
+      - name: Configure static build
+        run: |
+          cd qemu-src
+          # Key configuration options:
+          # --static: Build fully static binaries
+          # --disable-system: Skip system emulation
+          # --enable-linux-user: Enable user-mode emulation
+          # --target-list: Build all supported architectures
+          ./configure \
+            --static \
+            --disable-system \
+            --enable-linux-user \
+            --disable-bsd-user \
+            --disable-docs \
+            --target-list="$(./scripts/list-target-arches.py | xargs)"
+
+      # 5. Compile QEMU binaries
+      - name: Compile QEMU
+        run: |
+          cd qemu-src
+          # Parallel build using all available CPU cores
+          make -j$(nproc)
+
+      # 6. Prepare build artifacts for release
+      - name: Prepare artifacts
+        run: |
+          # Create output directory
+          mkdir -p qemu-static-bin
+          
+          # Copy compiled binaries (excluding shared libraries)
+          find qemu-src/build -name 'qemu-*' ! -name '*.so' \
+            -exec cp {} qemu-static-bin/{}-static \;
+          
+          # Verify static linking
+          file qemu-static-bin/* | grep "statically linked"
+          
+          # Generate SHA256 checksums for integrity verification
+          cd qemu-static-bin
+          sha256sum * > SHA256SUMS
+
+      # 7. Checkout current repository for release operations
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full commit history for tagging
+
+      # 8. Configure Git identity for release operations
+      - name: Configure Git
+        run: |
+          # Set identity for automated commits/tags
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      # 9. Install GitHub CLI for release management
+      - name: Install GitHub CLI
+        run: |
+          # Add official GitHub CLI repository
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          
+          # Install CLI package
+          apt update
+          apt install -y gh
+
+      # 10. Authenticate with GitHub API
+      - name: Authenticate gh CLI
+        run: |
+          # Use repository token for authentication
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+
+      # 11. Create GitHub release with artifacts
+      - name: Create GitHub release
+        run: |
+          # Generate unique tag name using workflow run ID
+          TAG_NAME="qemu-user-static-v10.0.3-${{ github.run_id }}"
+          RELEASE_DIR="./qemu-static-bin"
+          
+          # Get current commit SHA for tagging
+          CURRENT_SHA=$(git rev-parse HEAD)
+          # Clean any extraneous newlines
+          CURRENT_SHA=$(echo "$CURRENT_SHA" | tr -d '\n')
+
+          # Validate SHA exists
+          if [ -z "$CURRENT_SHA" ]; then
+            echo "::error::COMMIT_SHA empty, cannot create release"
+            exit 1
+          fi
+
+          # Create lightweight tag if doesn't exist
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Creating tag $TAG_NAME at $CURRENT_SHA"
+            git tag "$TAG_NAME" "$CURRENT_SHA"
+            git push origin "$TAG_NAME"
+          else
+            echo "Tag $TAG_NAME already exists"
+          fi
+
+          # Create release notes with build details
+          {
+            echo "QEMU User Static Binaries v10.0.3"
+            echo ""
+            echo "**Build Details:**"
+            echo "- Build Run ID: \`${{ github.run_id }}\`"
+            echo "- Triggered by: @${{ github.actor }}"
+            echo "- Commit SHA: $CURRENT_SHA"
+            echo "- Built in Ubuntu 20.04 container"
+            echo "- Includes ARM Cortex-A5 support patch"
+            echo ""
+            echo "**Artifacts:**"
+            echo "Statically linked QEMU user-mode binaries for:"
+            echo $(cd qemu-static-bin; ls qemu-*-static | sed 's/-static//' | xargs echo)
+            echo ""
+            echo "### Verification"
+            echo "SHA256 checksums:"
+            cat "$RELEASE_DIR/SHA256SUMS"
+          } > release_notes.md
+
+          # Create pre-release if doesn't exist
+          if ! gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Creating release $TAG_NAME"
+            gh release create "$TAG_NAME" \
+              --title "QEMU User Static v10.0.3 (Build ${{ github.run_id }})" \
+              --notes-file release_notes.md \
+              --prerelease
+          else
+            echo "Release $TAG_NAME already exists"
+          fi
+
+          # Upload all artifacts (handles filenames with spaces)
+          find "$RELEASE_DIR" -type f -print0 | while IFS= read -r -d '' file; do
+            echo "Uploading: $file"
+            gh release upload "$TAG_NAME" "$file" --clobber
+          done

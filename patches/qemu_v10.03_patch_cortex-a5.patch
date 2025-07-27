@@ -1,0 +1,79 @@
+diff --git a/docs/system/arm/virt.rst b/docs/system/arm/virt.rst
+index 6a719b9586..6b4093e100 100644
+--- a/docs/system/arm/virt.rst
++++ b/docs/system/arm/virt.rst
+@@ -60,6 +60,7 @@ TrustZone emulation is not enabled.
+ 
+ Supported guest CPU types:
+ 
++- ``cortex-a5`` (32-bit)
+ - ``cortex-a7`` (32-bit)
+ - ``cortex-a15`` (32-bit; the default)
+ - ``cortex-a35`` (64-bit)
+diff --git a/hw/arm/virt.c b/hw/arm/virt.c
+index 0e78616aac..63b21f2812 100644
+--- a/hw/arm/virt.c
++++ b/hw/arm/virt.c
+@@ -3135,6 +3135,7 @@ static void virt_machine_class_init(ObjectClass *oc, void *data)
+     HotplugHandlerClass *hc = HOTPLUG_HANDLER_CLASS(oc);
+     static const char * const valid_cpu_types[] = {
+ #ifdef CONFIG_TCG
++        ARM_CPU_TYPE_NAME("cortex-a5"),
+         ARM_CPU_TYPE_NAME("cortex-a7"),
+         ARM_CPU_TYPE_NAME("cortex-a15"),
+ #ifdef TARGET_AARCH64
+diff --git a/target/arm/tcg/cpu32.c b/target/arm/tcg/cpu32.c
+index 2c45b7eddd..392d861d06 100644
+--- a/target/arm/tcg/cpu32.c
++++ b/target/arm/tcg/cpu32.c
+@@ -380,6 +380,42 @@ static void cortex_a8_initfn(Object *obj)
+     define_arm_cp_regs(cpu, cortexa8_cp_reginfo);
+ }
+ 
++static void cortex_a5_initfn(Object *obj)
++{
++    ARMCPU *cpu = ARM_CPU(obj);
++
++    cpu->dtb_compatible = "arm,cortex-a5";
++    set_feature(&cpu->env, ARM_FEATURE_V7);
++    set_feature(&cpu->env, ARM_FEATURE_NEON);
++    set_feature(&cpu->env, ARM_FEATURE_THUMB2EE);
++    set_feature(&cpu->env, ARM_FEATURE_GENERIC_TIMER);
++    set_feature(&cpu->env, ARM_FEATURE_DUMMY_C15_REGS);
++    set_feature(&cpu->env, ARM_FEATURE_PMU);
++    cpu->midr = 0x410fc0f1;
++    cpu->reset_fpsid = 0x41023051;
++    cpu->isar.mvfr0 = 0x10110221;
++    cpu->isar.mvfr1 = 0x11000011;
++    cpu->ctr = 0x83338003;
++    cpu->reset_sctlr = 0x00c50078;
++    cpu->isar.id_pfr0 = 0x00001231;
++    cpu->isar.id_pfr1 = 0x00000011;
++    cpu->isar.id_dfr0 = 0x02010444;
++    cpu->id_afr0 = 0x00000000;
++    cpu->isar.id_mmfr0 = 0x00100103;
++    cpu->isar.id_mmfr1 = 0x40000000;
++    cpu->isar.id_mmfr2 = 0x01230000;
++    cpu->isar.id_mmfr3 = 0x00102211;
++    cpu->isar.id_isar0 = 0x00101111;
++    cpu->isar.id_isar1 = 0x13112111;
++    cpu->isar.id_isar2 = 0x21232041;
++    cpu->isar.id_isar3 = 0x11112131;
++    cpu->isar.id_isar4 = 0x00011142;
++    cpu->isar.dbgdidr = 0x1203f001;
++    cpu->clidr = 0x09200003;
++    cpu->ccsidr[0] = 0x701fe00a;
++    cpu->ccsidr[1] = 0x203fe00a;
++}
++
+ static const ARMCPRegInfo cortexa9_cp_reginfo[] = {
+     /*
+      * power_control should be set to maximum latency. Again,
+@@ -1016,6 +1052,7 @@ static const ARMCPUInfo arm_tcg_cpus[] = {
+     { .name = "arm1136",     .initfn = arm1136_initfn },
+     { .name = "arm1176",     .initfn = arm1176_initfn },
+     { .name = "arm11mpcore", .initfn = arm11mpcore_initfn },
++    { .name = "cortext-a5",  .initfn = cortex_a5_initfn },
+     { .name = "cortex-a7",   .initfn = cortex_a7_initfn },
+     { .name = "cortex-a8",   .initfn = cortex_a8_initfn },
+     { .name = "cortex-a9",   .initfn = cortex_a9_initfn },
