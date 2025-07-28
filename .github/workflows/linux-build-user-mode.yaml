@@ -137,17 +137,21 @@ jobs:
       - name: Prepare artifacts
         run: |
           # Create output directory
-          mkdir -p qemu-static-bin
+          mkdir -p qemu-static
 
           # Copy compiled binaries (excluding shared libraries)
-          cp -rf /usr/local/qemu qemu-static-bin/
+          cp -rf /usr/local/qemu/* qemu-static/
 
-          # Verify static linking
-          file qemu-static-bin/* | grep "statically linked"
+          # # Verify static linking
+          # file qemu-static/* | grep "statically linked"
 
           # Generate SHA256 checksums for integrity verification
-          cd qemu-static-bin
+          cd qemu-static
           sha256sum * > SHA256SUMS
+          cd ..
+
+          # Compress
+          tar -cJf qemu-user-static-v10.0.3-linux-x64.tar.xz qemu-static
 
       # 8. Checkout current repository for release operations
       - name: Checkout current repository
@@ -184,7 +188,7 @@ jobs:
         run: |
           # Generate unique tag name using workflow run ID
           TAG_NAME="qemu-user-static-v10.0.3-${{ github.run_id }}"
-          RELEASE_DIR="./qemu-static-bin"
+          RELEASE_DIR="./qemu-static"
 
           # Get current commit SHA for tagging
           CURRENT_SHA=$(git rev-parse HEAD)
@@ -219,7 +223,7 @@ jobs:
             echo ""
             echo "**Artifacts:**"
             echo "Statically linked QEMU user-mode binaries for:"
-            echo $(cd qemu-static-bin; ls qemu-*-static | sed 's/-static//' | xargs echo)
+            echo $(cd qemu-static; ls qemu-*-static | sed 's/-static//' | xargs echo)
             echo ""
             echo "### Verification"
             echo "SHA256 checksums:"
