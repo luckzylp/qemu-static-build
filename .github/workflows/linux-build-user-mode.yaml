@@ -139,9 +139,10 @@ jobs:
           cp -rf /usr/local/qemu/* qemu-static/
 
           # Generate SHA256 checksums for individual binaries (inside tarball)
-          cd qemu-static
-          sha256sum * > SHA256SUMS
-          cd ..
+          (
+            cd qemu-static
+            find . -type f -exec sha256sum {} + > SHA256SUMS
+          )
 
           # Create tarball (contains qemu-static/ directory with all files)
           tar -cJf qemu-user-static-v10.0.3-linux-x64.tar.xz qemu-static
