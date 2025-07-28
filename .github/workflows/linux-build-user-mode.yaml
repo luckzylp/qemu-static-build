@@ -16,8 +16,8 @@ jobs:
       contents: write  # Enables creating tags and releases
 
     # Continue other jobs if one fails
-    strategy:
-      fail-fast: false
+    # strategy:
+      # fail-fast: false
 
     steps:
       # 1. Install essential build tools and libraries
@@ -30,7 +30,7 @@ jobs:
             pkg-config libglib2.0-dev libpixman-1-dev \
             zlib1g-dev libfdt-dev libslirp-dev \
             libaio-dev libcap-ng-dev \
-            python3-setuptools curl  # curl needed for GitHub CLI install
+            python3-setuptools python3.8-venv curl
 
       # 2. Get QEMU source code
       - name: Checkout QEMU v10.0.3
@@ -39,7 +39,7 @@ jobs:
           repository: qemu/qemu    # Source repository
           ref: v10.0.3             # Specific version tag
           path: qemu-src           # Directory to clone into
-          
+
       # 3. Get QEMU Patch code
       - name: Checkout QEMU v10.0.3 patch
         uses: actions/checkout@v4  # Official GitHub checkout action
@@ -73,8 +73,7 @@ jobs:
             --disable-system \
             --enable-linux-user \
             --disable-bsd-user \
-            --disable-docs \
-            --target-list="$(./scripts/list-target-arches.py | xargs)"
+            --disable-docs"
 
       # 6. Compile QEMU binaries
       - name: Compile QEMU
@@ -88,14 +87,14 @@ jobs:
         run: |
           # Create output directory
           mkdir -p qemu-static-bin
-          
+
           # Copy compiled binaries (excluding shared libraries)
           find qemu-src/build -name 'qemu-*' ! -name '*.so' \
             -exec cp {} qemu-static-bin/{}-static \;
-          
+
           # Verify static linking
           file qemu-static-bin/* | grep "statically linked"
-          
+
           # Generate SHA256 checksums for integrity verification
           cd qemu-static-bin
           sha256sum * > SHA256SUMS
@@ -119,7 +118,7 @@ jobs:
           # Add official GitHub CLI repository
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          
+
           # Install CLI package
           apt update
           apt install -y gh
@@ -136,7 +135,7 @@ jobs:
           # Generate unique tag name using workflow run ID
           TAG_NAME="qemu-user-static-v10.0.3-${{ github.run_id }}"
           RELEASE_DIR="./qemu-static-bin"
-          
+
           # Get current commit SHA for tagging
           CURRENT_SHA=$(git rev-parse HEAD)
           # Clean any extraneous newlines
