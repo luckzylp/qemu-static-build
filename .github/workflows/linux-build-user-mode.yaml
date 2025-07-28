@@ -30,7 +30,7 @@ jobs:
             pkg-config libpixman-1-dev \
             zlib1g-dev libfdt-dev libslirp-dev \
             libaio-dev libcap-ng-dev \
-            curl libffi-dev \
+            curl wget libffi-dev \
             zlib1g-dev \
             libmount-dev \
             libpcre3-dev \
