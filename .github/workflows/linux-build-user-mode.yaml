@@ -122,7 +122,7 @@ jobs:
             --disable-system \
             --enable-linux-user \
             --disable-bsd-user \
-            --disable-docs
+            --disable-docs \
             --prefix=/usr/local/qemu
 
       # 6. Compile QEMU binaries
