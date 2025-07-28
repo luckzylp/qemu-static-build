@@ -5,15 +5,13 @@ on:
 
 jobs:
   build-static-qemu:
-    # Use Ubuntu 20.04 container environment
     runs-on: ubuntu-latest
     container:
       image: ubuntu:20.04  # Specific OS version for build consistency
       options: --user root  # Run as root for package installation
 
-    # Required permissions for creating releases and tags
     permissions:
-      contents: write  # Enables creating tags and releases
+      contents: write  # Required for creating tags/releases
 
     # Continue other jobs if one fails
     # strategy:
@@ -38,15 +36,15 @@ jobs:
             pkg-config meson \
             flex bison
 
-      # 1.1. Install python3.8
-      - name: Install python3 dependencies
+      # 1.1. Install Python 3.8 and dependencies
+      - name: Install Python 3.8
         run: |
            apt-get update
            apt install -y python3 python3-setuptools python3-dev python3-pip python3-venv
            pip3 install --upgrade setuptools
 
-      # 1.2. Install glib-2.66.0
-      - name: Build and install glib-2.66.0
+      # 1.2. Build and install static GLib (required for QEMU)
+      - name: Build and install glib-2.66.0 (static)
         run: |
           #  Download glib-2.66.0 source code
           wget https://download.gnome.org/sources/glib/2.66/glib-2.66.0.tar.xz
@@ -70,21 +68,21 @@ jobs:
           export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
           echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
-      # 2. Get QEMU source code
+      # 2. Checkout QEMU source (v10.0.3)
       - name: Checkout QEMU v10.0.3
-        uses: actions/checkout@v4  # Official GitHub checkout action
+        uses: actions/checkout@v4
         with:
-          repository: qemu/qemu    # Source repository
-          ref: v10.0.3             # Specific version tag
-          path: qemu-src           # Directory to clone into
+          repository: qemu/qemu
+          ref: v10.0.3
+          path: qemu-src
 
-      # 3. Get QEMU Patch code
-      - name: Checkout QEMU v10.0.3 patch
-        uses: actions/checkout@v4  # Official GitHub checkout action
+      # 3. Checkout custom patch for ARM Cortex-A5 support
+      - name: Checkout QEMU patch repository
+        uses: actions/checkout@v4
         with:
-          path: qemu-patch           # Directory to clone into
+          path: qemu-patch  # Directory for patch files
 
-      # 4. Apply custom patch for ARM Cortex-A5 support
+      # 4. Apply Cortex-A5 patch to QEMU source
       - name: Apply ARM Cortex-A5 support patch
         run: |
           cd qemu-src
@@ -97,6 +95,7 @@ jobs:
         #   - name: Apply verified patch
         #     run: git apply $PATCH_FILE
 
+      # 5. Setup Python virtual environment for QEMU build
       - name: Setup Python environment
         run: |
           cd qemu-src
@@ -104,12 +103,11 @@ jobs:
           . pyvenv/bin/activate
           pip3 install --upgrade pip
           pip3 install tomli setuptools meson
-          python3 -c "import tomli; print(tomli.__version__)"
           echo "VIRTUAL_ENV=$PWD/pyvenv" >> $GITHUB_ENV
           echo "PATH=$PWD/pyvenv/bin:$PATH" >> $GITHUB_ENV
 
-      # 5. Configure build parameters for static compilation
-      - name: Configure static build
+      # 6. Configure QEMU for static user-mode build
+      - name: Configure static build (user-mode only)
         run: |
           cd qemu-src
           # Key configuration options:
@@ -125,7 +123,7 @@ jobs:
             --disable-docs \
             --prefix=/usr/local/qemu
 
-      # 6. Compile QEMU binaries
+      # 7. Compile QEMU
       - name: Compile QEMU
         run: |
           cd qemu-src
@@ -133,116 +131,107 @@ jobs:
           make -j$(nproc)
           make install
 
-      # 7. Prepare build artifacts for release
-      - name: Prepare artifacts
+      # 8. Prepare artifacts (tarball with binaries and checksums)
+      - name: Prepare release artifacts
         run: |
           # Create output directory
           mkdir -p qemu-static
-
-          # Copy compiled binaries (excluding shared libraries)
           cp -rf /usr/local/qemu/* qemu-static/
 
-          # # Verify static linking
-          # file qemu-static/* | grep "statically linked"
-
-          # Generate SHA256 checksums for integrity verification
+          # Generate SHA256 checksums for individual binaries (inside tarball)
           cd qemu-static
           sha256sum * > SHA256SUMS
           cd ..
 
-          # Compress
+          # Create tarball (contains qemu-static/ directory with all files)
           tar -cJf qemu-user-static-v10.0.3-linux-x64.tar.xz qemu-static
 
-      # 8. Checkout current repository for release operations
+          # Optional: Verify static linking (uncomment to enable)
+          # file qemu-static/* | grep "statically linked"
+
+      # 9. Checkout current repository for release operations
       - name: Checkout current repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Get full commit history for tagging
+          fetch-depth: 0  # Required for tagging
 
-      # 9. Configure Git identity for release operations
+      # 10. Configure Git identity for tagging
       - name: Configure Git
         run: |
           # Set identity for automated commits/tags
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      # 10. Install GitHub CLI for release management
+      # 11. Install GitHub CLI for release management
       - name: Install GitHub CLI
         run: |
-          # Add official GitHub CLI repository
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          apt update && apt install -y gh
 
-          # Install CLI package
-          apt update
-          apt install -y gh
-
-      # 11. Authenticate with GitHub API
+      # 12. Authenticate GitHub CLI
       - name: Authenticate gh CLI
         run: |
           # Use repository token for authentication
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
-      # 12. Create GitHub release with artifacts
-      - name: Create GitHub release
+      # 13. Create GitHub release and upload tarball
+      - name: Create release and upload tarball
         run: |
-          # Generate unique tag name using workflow run ID
+          # Generate unique tag name (includes run ID for uniqueness)
           TAG_NAME="qemu-user-static-v10.0.3-${{ github.run_id }}"
-          RELEASE_DIR="./qemu-static"
+          TARBALL_PATH="./qemu-user-static-v10.0.3-linux-x64.tar.xz"
 
           # Get current commit SHA for tagging
-          CURRENT_SHA=$(git rev-parse HEAD)
-          # Clean any extraneous newlines
-          CURRENT_SHA=$(echo "$CURRENT_SHA" | tr -d '\n')
-
-          # Validate SHA exists
+          CURRENT_SHA=$(git rev-parse HEAD | tr -d '\n')
           if [ -z "$CURRENT_SHA" ]; then
-            echo "::error::COMMIT_SHA empty, cannot create release"
+            echo "::error::Commit SHA is empty. Cannot create release."
             exit 1
           fi
 
-          # Create lightweight tag if doesn't exist
+          # Create tag if it doesn't exist
           if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Creating tag $TAG_NAME at $CURRENT_SHA"
             git tag "$TAG_NAME" "$CURRENT_SHA"
             git push origin "$TAG_NAME"
+            echo "Created tag: $TAG_NAME"
           else
-            echo "Tag $TAG_NAME already exists"
+            echo "Tag $TAG_NAME already exists. Skipping."
           fi
 
-          # Create release notes with build details
+          # Generate release notes
           {
-            echo "QEMU User Static Binaries v10.0.3"
+            echo "## QEMU User Static Binaries v10.0.3"
             echo ""
-            echo "**Build Details:**"
-            echo "- Build Run ID: \`${{ github.run_id }}\`"
-            echo "- Triggered by: @${{ github.actor }}"
-            echo "- Commit SHA: $CURRENT_SHA"
-            echo "- Built in Ubuntu 20.04 container"
-            echo "- Includes ARM Cortex-A5 support patch"
+            echo "### Build Details"
+            echo "- **Run ID**: \`${{ github.run_id }}\`"
+            echo "- **Triggered by**: @${{ github.actor }}"
+            echo "- **Commit SHA**: \`$CURRENT_SHA\`"
+            echo "- **Environment**: Ubuntu 20.04 Container"
+            echo "- **Patch**: ARM Cortex-A5 Support"
             echo ""
-            echo "**Artifacts:**"
-            echo "Statically linked QEMU user-mode binaries for:"
-            echo $(cd qemu-static; ls qemu-*-static | sed 's/-static//' | xargs echo)
+            echo "### Artifact"
+            echo "Statically linked user-mode binaries packaged in:"
+            echo "\`$(basename "$TARBALL_PATH")\`"
             echo ""
             echo "### Verification"
-            echo "SHA256 checksums:"
-            cat "$RELEASE_DIR/SHA256SUMS"
+            echo "#### Tarball Checksum"
+            sha256sum "$TARBALL_PATH" | awk '{printf "`%s`  %s\n", $1, $2}'
+            echo ""
+            echo "#### Individual Binaries"
+            echo "SHA256 checksums for individual binaries are included inside the tarball (\`SHA256SUMS\` file)."
           } > release_notes.md
 
-          # Create pre-release if doesn't exist
+          # Create release (if not exists)
           if ! gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Creating release $TAG_NAME"
             gh release create "$TAG_NAME" \
               --title "QEMU User Static v10.0.3 (Build ${{ github.run_id }})" \
               --notes-file release_notes.md \
               --prerelease
+            echo "Created release: $TAG_NAME"
           else
-            echo "Release $TAG_NAME already exists"
+            echo "Release $TAG_NAME already exists. Skipping creation."
           fi
 
-          # Upload all artifacts (handles filenames with spaces)
-          find "$RELEASE_DIR" -type f -print0 | while IFS= read -r -d '' file; do
-            echo "Uploading: $file"
-            gh release upload "$TAG_NAME" "$file" --clobber
-          done
+          # Upload tarball (overwrites if already exists)
+          echo "Uploading artifact: $TARBALL_PATH"
+          gh release upload "$TAG_NAME" "$TARBALL_PATH" --clobber
