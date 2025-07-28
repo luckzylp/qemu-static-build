@@ -35,24 +35,8 @@ jobs:
             libmount-dev \
             libpcre3-dev \
             gettext \
-            pkg-config meson
-
-      # # 1.1. Install python3.12
-      # - name: Install python3.12 dependencies
-      #   run: |
-      #     apt-get update
-      #     export DEBIAN_FRONTEND=noninteractive
-      #     apt install -y software-properties-common
-      #     add-apt-repository ppa:deadsnakes/ppa
-      #     apt-cache policy python3.12
-      #     apt install -y python3.12
-      #     apt install -y python3.12-venv python3.12-dev python3-setuptools python3-pip
-      #     pip3 install --upgrade setuptools
-      #     ls /usr/bin/python*
-      #     update-alternatives --install /usr/bin/python python /usr/bin/python3.12 100
-      #     update-alternatives --config python
-      #     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 100
-      #     update-alternatives --config python3
+            pkg-config meson \
+            flex bison
 
       # 1.1. Install python3.8
       - name: Install python3 dependencies
