@@ -35,7 +35,7 @@ jobs:
             libmount-dev \
             libpcre3-dev \
             gettext \
-            pkg-config
+            pkg-config meson
 
       # 1.1. Install python3.12
       - name: Install python3.12 dependencies
@@ -60,14 +60,10 @@ jobs:
           wget https://download.gnome.org/sources/glib/2.66/glib-2.66.0.tar.xz
           tar -xf glib-2.66.0.tar.xz
           cd glib-2.66.0
-
-          ./configure --prefix=/usr/local \
-                      --disable-debug \
-                      --enable-release
-
-          make -j$(nproc)
-          sudo make install
-
+          mkdir -p _build
+          meson setup _build -Dprefix=/usr/local/glib-2.0/
+          ninja -C _build
+          ninja -C _build install
           export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
           echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
