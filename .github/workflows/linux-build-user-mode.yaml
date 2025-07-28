@@ -46,7 +46,7 @@ jobs:
           add-apt-repository ppa:deadsnakes/ppa
           apt-cache policy python3.12
           apt install -y python3.12
-          apt install -y python3.12-venv python3.12-dev
+          apt install -y python3.12-venv python3.12-dev python3-setuptools
           ls /usr/bin/python*
           update-alternatives --install /usr/bin/python python /usr/bin/python3.12 100
           update-alternatives --config python
