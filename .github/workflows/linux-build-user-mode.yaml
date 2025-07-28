@@ -30,11 +30,7 @@ jobs:
             pkg-config libpixman-1-dev \
             zlib1g-dev libfdt-dev libslirp-dev \
             libaio-dev libcap-ng-dev \
-            curl wget libffi-dev \
-            zlib1g-dev \
-            libmount-dev \
-            libpcre3-dev \
-            gettext \
+            curl wget \
             pkg-config meson
 
       # 1.1. Install python3.12
@@ -54,18 +50,24 @@ jobs:
           update-alternatives --config python3
 
       # 1.2. Install glib-2.66.0
-      - name: Build and install glib-2.66.0
+      - name: Install glib-2.66.0
         run: |
-          #  Download glib-2.66.0 source code
-          wget https://download.gnome.org/sources/glib/2.66/glib-2.66.0.tar.xz
-          tar -xf glib-2.66.0.tar.xz
-          cd glib-2.66.0
-          mkdir -p _build
-          meson setup _build -Dprefix=/usr/local/glib-2.0/
-          ninja -C _build
-          ninja -C _build install
-          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
-          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          apt-get update
+          export DEBIAN_FRONTEND=noninteractive
+          apt install -y software-properties-common
+          add-apt-repository ppa:gnome3-team/gnome3
+          apt install libglib2.0-0 libglib2.0-dev
+
+          # #  Download glib-2.66.0 source code
+          # wget https://download.gnome.org/sources/glib/2.66/glib-2.66.0.tar.xz
+          # tar -xf glib-2.66.0.tar.xz
+          # cd glib-2.66.0
+          # mkdir -p _build
+          # meson setup _build -Dprefix=/usr/local/glib-2.0/
+          # ninja -C _build
+          # ninja -C _build install
+          # export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+          # echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       # 2. Get QEMU source code
       - name: Checkout QEMU v10.0.3
