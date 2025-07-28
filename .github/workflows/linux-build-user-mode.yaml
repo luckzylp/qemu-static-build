@@ -73,7 +73,7 @@ jobs:
             --disable-system \
             --enable-linux-user \
             --disable-bsd-user \
-            --disable-docs"
+            --disable-docs
 
       # 6. Compile QEMU binaries
       - name: Compile QEMU
