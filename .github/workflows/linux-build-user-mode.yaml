@@ -55,7 +55,15 @@ jobs:
           mkdir -p _build
           meson setup _build \
             --prefix=/usr/local \
-            --buildtype=release
+            --buildtype=release \
+            --default-library=static \
+            -Dinternal_pcre=true \
+            -Dselinux=disabled \
+            -Dlibmount=disabled \
+            -Dman=false \
+            -Dtests=false \
+            -Dgtk_doc=false \
+            -Dnls=disabled
 
           ninja -C _build
           ninja -C _build install
