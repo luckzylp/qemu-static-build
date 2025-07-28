@@ -27,10 +27,15 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get install -y \
             git build-essential ninja-build \
-            pkg-config libglib2.0-dev libpixman-1-dev \
+            pkg-config libpixman-1-dev \
             zlib1g-dev libfdt-dev libslirp-dev \
             libaio-dev libcap-ng-dev \
-            curl
+            curl libffi-dev \
+            zlib1g-dev \
+            libmount-dev \
+            libpcre3-dev \
+            gettext \
+            pkg-config
 
       # 1.1. Install python3.12
       - name: Install python3.12 dependencies
@@ -47,6 +52,24 @@ jobs:
           update-alternatives --config python
           update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 100
           update-alternatives --config python3
+
+      # 1.2. Install glib-2.66.0
+      - name: Build and install glib-2.66.0
+        run: |
+          #  Download glib-2.66.0 source code
+          wget https://download.gnome.org/sources/glib/2.66/glib-2.66.0.tar.xz
+          tar -xf glib-2.66.0.tar.xz
+          cd glib-2.66.0
+
+          ./configure --prefix=/usr/local \
+                      --disable-debug \
+                      --enable-release
+
+          make -j$(nproc)
+          sudo make install
+
+          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       # 2. Get QEMU source code
       - name: Checkout QEMU v10.0.3
