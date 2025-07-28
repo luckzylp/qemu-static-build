@@ -30,8 +30,23 @@ jobs:
             pkg-config libglib2.0-dev libpixman-1-dev \
             zlib1g-dev libfdt-dev libslirp-dev \
             libaio-dev libcap-ng-dev \
-            python3-setuptools python3.8-venv curl \
-            python3 python3-tomli
+            curl
+
+      # 1.1. Install python3.12
+      - name: Install python3.12 dependencies
+        run: |
+          apt-get update
+          export DEBIAN_FRONTEND=noninteractive
+          apt install -y software-properties-common
+          add-apt-repository ppa:deadsnakes/ppa
+          apt-cache policy python3.12
+          apt install -y python3.12
+          apt install -y python3.12-venv python3.12-dev
+          ls /usr/bin/python*
+          update-alternatives --install /usr/bin/python python /usr/bin/python3.12 100
+          update-alternatives --config python
+          update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 100
+          update-alternatives --config python3
 
       # 2. Get QEMU source code
       - name: Checkout QEMU v10.0.3
@@ -59,17 +74,6 @@ jobs:
         #   - run: git apply --check $PATCH_FILE  # Test patch without applying
         #   - name: Apply verified patch
         #     run: git apply $PATCH_FILE
-
-      # - name: Prepare Python virtual environment
-      #   run: |
-      #     cd qemu-src
-      #     if [ ! -d "build/pyvenv" ]; then
-      #       python3.8 -m venv build/pyvenv
-      #     fi
-      #     . build/pyvenv/bin/activate
-      #     python -m ensurepip --upgrade
-      #     pip install tomli
-      #     deactivate
 
       # 5. Configure build parameters for static compilation
       - name: Configure static build
