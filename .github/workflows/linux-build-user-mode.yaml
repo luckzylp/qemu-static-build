@@ -123,6 +123,7 @@ jobs:
             --enable-linux-user \
             --disable-bsd-user \
             --disable-docs
+            --prefix=/usr/local/qemu
 
       # 6. Compile QEMU binaries
       - name: Compile QEMU
@@ -130,6 +131,7 @@ jobs:
           cd qemu-src
           # Parallel build using all available CPU cores
           make -j$(nproc)
+          make install
 
       # 7. Prepare build artifacts for release
       - name: Prepare artifacts
@@ -138,8 +140,7 @@ jobs:
           mkdir -p qemu-static-bin
 
           # Copy compiled binaries (excluding shared libraries)
-          find qemu-src/build -name 'qemu-*' ! -name '*.so' \
-            -exec cp {} qemu-static-bin/{}-static \;
+          cp -rf /usr/local/qemu qemu-static-bin/
 
           # Verify static linking
           file qemu-static-bin/* | grep "statically linked"
