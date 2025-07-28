@@ -59,6 +59,17 @@ jobs:
         #   - name: Apply verified patch
         #     run: git apply $PATCH_FILE
 
+      - name: Prepare Python virtual environment
+        run: |
+          cd qemu-src
+          if [ ! -d "build/pyvenv" ]; then
+            python3.8 -m venv build/pyvenv
+          fi
+          source build/pyvenv/bin/activate
+          python -m ensurepip --upgrade
+          pip install tomli
+          deactivate
+
       # 5. Configure build parameters for static compilation
       - name: Configure static build
         run: |
@@ -74,17 +85,6 @@ jobs:
             --enable-linux-user \
             --disable-bsd-user \
             --disable-docs
-
-      - name: Prepare Python virtual environment
-        run: |
-          cd qemu-src
-          if [ ! -d "build/pyvenv" ]; then
-            python3.8 -m venv build/pyvenv
-          fi
-          source build/pyvenv/bin/activate
-          python -m ensurepip --upgrade
-          pip install tomli
-          deactivate
 
       # 6. Compile QEMU binaries
       - name: Compile QEMU
