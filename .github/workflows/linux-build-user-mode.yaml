@@ -65,7 +65,7 @@ jobs:
           if [ ! -d "build/pyvenv" ]; then
             python3.8 -m venv build/pyvenv
           fi
-          source build/pyvenv/bin/activate
+          . build/pyvenv/bin/activate
           python -m ensurepip --upgrade
           pip install tomli
           deactivate
