@@ -1,4 +1,4 @@
-name: Build Static QEMU User-Mode Binaries (v10.0.3)
+name: Build Static QEMU Binaries (v10.0.3)
 
 on:
   workflow_dispatch:  # Only allow manual triggering via GitHub UI
@@ -115,11 +115,11 @@ jobs:
           # --disable-system: Skip system emulation
           # --enable-linux-user: Enable user-mode emulation
           # --target-list: Build all supported architectures
+          # --disable-system
+          # --enable-linux-user
+          # --disable-bsd-user
           ./configure \
             --static \
-            --disable-system \
-            --enable-linux-user \
-            --disable-bsd-user \
             --disable-docs \
             --prefix=/usr/local/qemu
 
@@ -146,7 +146,7 @@ jobs:
 
           # Create tarball (contains qemu-static/ directory with all files)
           mv qemu-static qemu-static-v10.0.3
-          tar -cJf qemu-user-static-v10.0.3-linux-x64.tar.xz qemu-static-v10.0.3
+          tar -cJf qemu-static-v10.0.3-linux-x64.tar.xz qemu-static-v10.0.3
 
           # Optional: Verify static linking (uncomment to enable)
           # file qemu-static-v10.0.3/* | grep "statically linked"
@@ -155,8 +155,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: qemu-user-static-v10.0.3-linux-x64
-          path: ./qemu-user-static-v10.0.3-linux-x64.tar.xz
+          name: qemu-static-v10.0.3-linux-x64
+          path: ./qemu-static-v10.0.3-linux-x64.tar.xz
 
   # Release creation job
   create-release:
@@ -179,7 +179,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: all_artifacts
-          pattern: qemu-user-static-*
+          pattern: qemu-static-*
           merge-multiple: true
 
       - name: Setup GitHub CLI
@@ -192,7 +192,7 @@ jobs:
 
       - name: Create tag and push
         run: |
-          RELEASE_TAG="qemu-user-static-v10.0.3-${{ github.run_id }}"
+          RELEASE_TAG="qemu-static-v10.0.3-${{ github.run_id }}"
 
           # Use current HEAD commit instead
           COMMIT_SHA=$(git rev-parse HEAD)
@@ -216,7 +216,7 @@ jobs:
           # Create prerelease targeting specific commit SHA
           if ! gh release view $RELEASE_TAG >/dev/null 2>&1; then
             {
-              echo "## QEMU User Static Binaries v10.0.3"
+              echo "## QEMU Static Binaries v10.0.3"
               echo ""
               echo "### Build Details"
               echo "- **Run ID**: \`${{ github.run_id }}\`"
@@ -228,7 +228,7 @@ jobs:
 
             # Create as prerelease using the --prerelease flag
             gh release create "$RELEASE_TAG" \
-              --title "qemu-user-static-v10.0.3 \
+              --title "qemu-static-v10.0.3 \
               --notes-file release_notes.md \
               --target "$COMMIT_SHA" \
               --prerelease
