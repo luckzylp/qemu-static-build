@@ -1,0 +1,274 @@
+name: Build Static QEMU Binaries (v10.0.3)
+
+on:
+  workflow_dispatch:  # Only allow manual triggering via GitHub UI
+
+jobs:
+  build-system-qemu:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04  # Specific OS version for build consistency
+      options: --user root  # Run as root for package installation
+
+    permissions:
+      contents: write  # Required for creating tags/releases
+
+    # Continue other jobs if one fails
+    # strategy:
+      # fail-fast: false
+
+    steps:
+      # 1. Install build dependencies
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get install -y \
+            git build-essential ninja-build \
+            pkg-config libpixman-1-dev \
+            zlib1g-dev libfdt-dev libslirp-dev \
+            libaio-dev libcap-ng-dev \
+            curl wget libffi-dev \
+            zlib1g-dev \
+            libmount-dev \
+            libpcre3-dev \
+            gettext \
+            pkg-config meson \
+            flex bison \
+            python3 python3-setuptools python3-dev python3-pip python3-venv \
+            git-email \
+            libaio-dev libbluetooth-dev libcapstone-dev libbrlapi-dev libbz2-dev \
+            libcap-ng-dev libcurl4-gnutls-dev libgtk-3-dev \
+            libibverbs-dev libjpeg8-dev libncurses5-dev libnuma-dev \
+            librbd-dev librdmacm-dev \
+            libsasl2-dev libsdl2-dev libseccomp-dev libsnappy-dev libssh-dev \
+            libvde-dev libvdeplug-dev libvte-2.91-dev libxen-dev liblzo2-dev \
+            valgrind xfslibs-dev  \
+            libnfs-dev libiscsi-dev
+
+          # upgrade python3 setuptools
+          pip3 install --upgrade setuptools
+
+      # 2. Build static GLib (dependency for QEMU)
+      - name: Build static GLib (2.66.0)
+        run: |
+          #  Download glib-2.66.0 source code
+          wget https://download.gnome.org/sources/glib/2.66/glib-2.66.0.tar.xz
+          tar -xf glib-2.66.0.tar.xz
+          cd glib-2.66.0
+          mkdir -p _build
+          meson setup _build \
+            --prefix=/usr/local \
+            --buildtype=release \
+            --default-library=static \
+            -Dinternal_pcre=true \
+            -Dselinux=disabled \
+            -Dlibmount=disabled \
+            -Dman=false \
+            -Dtests=false \
+            -Dgtk_doc=false \
+            -Dnls=disabled
+
+          ninja -C _build
+          ninja -C _build install
+          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      # 3. Checkout QEMU source
+      - name: Checkout QEMU v10.0.3
+        uses: actions/checkout@v4
+        with:
+          repository: qemu/qemu
+          ref: v10.0.3
+          path: qemu-src
+
+      # 4. Checkout custom patch for ARM Cortex-A5 support
+      - name: Checkout QEMU patch repository
+        uses: actions/checkout@v4
+        with:
+          path: qemu-patch  # Directory for patch files
+
+      # 5. Apply Cortex-A5 patch to QEMU source
+      - name: Apply ARM Cortex-A5 support patch
+        run: |
+          cd qemu-src
+          # Apply patch from repository's patches directory, clone path is ./qemu-static-build/qemu-src
+          git apply ../qemu-patch/patches/qemu_v10.0.3_patch_cortex-a5.patch
+        env:
+          PATCH_FILE: "patches/qemu_v10.0.3_patch_cortex-a5.patch"  # Patch location
+        # Optional: Add these steps for pre-application validation
+        #   - run: git apply --check $PATCH_FILE  # Test patch without applying
+        #   - name: Apply verified patch
+        #     run: git apply $PATCH_FILE
+
+      # 6. Setup Python virtual environment
+      - name: Setup Python venv
+        run: |
+          cd qemu-src
+          python3 -m venv pyvenv
+          . pyvenv/bin/activate
+          pip3 install --upgrade pip
+          pip3 install tomli setuptools meson
+          echo "VIRTUAL_ENV=$PWD/pyvenv" >> $GITHUB_ENV
+          echo "PATH=$PWD/pyvenv/bin:$PATH" >> $GITHUB_ENV
+
+      # 7. Configure QEMU for static user-mode build
+      - name: Configure static build (user-mode only)
+        run: |
+          cd qemu-src
+          ./configure \
+            --prefix=/usr/local/qemu
+
+      # 8. Compile and install QEMU
+      - name: Compile QEMU
+        run: |
+          cd qemu-src
+          # Parallel build using all available CPU cores
+          make -j$(nproc)
+          make install
+
+      # 9. Prepare artifacts (using versioned names)
+      - name: Package artifacts
+        run: |
+          # Create output directory
+          ARTIFACT_DIR="qemu-system-v10.0.3-linux-x64"
+          mkdir -p $ARTIFACT_DIR
+          cp -rf /usr/local/qemu/* $ARTIFACT_DIR/
+
+          # Generate checksums (inside the artifact directory)
+          (cd $ARTIFACT_DIR && find . -type f -exec sha256sum {} + > SHA256SUMS)
+
+          # Create tarball
+          tar -cJf "${ARTIFACT_DIR}.tar.xz" $ARTIFACT_DIR
+
+      # 10. Upload artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-system-v10.0.3-linux-x64
+          path: qemu-system-v10.0.3-linux-x64.tar.xz
+
+  # Release creation job
+  create-release:
+    needs: [build-system-qemu]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qemu-system-v10.0.3-linux-x64
+          path: all_artifacts
+          pattern: qemu-*
+          merge-multiple: true
+
+      - name: Setup GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: Authenticate GitHub CLI
+        run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Create release notes
+        run: |
+          cat > release_notes.md << EOF
+          ## QEMU User Static Binaries v10.0.3 - Build ${{ github.run_id }}
+
+          ### Overview
+          This release provides **statically linked QEMU user-mode emulation binaries** for Linux, built from QEMU v10.0.3. A custom patch adds support for the **ARM Cortex-A5** processor. Static linking ensures portability across most Linux distributions.
+
+          ### Key Features
+          - 🛠️ **ARM Cortex-A5 Support**: Custom patch applied (`qemu_v10.0.3_patch_cortex-a5.patch`).
+          - 🌍 **Multi-Architecture**: Includes binaries for all supported targets (e.g., `qemu-system-arm`, `qemu-system-x86_64`).
+
+          ### Build Configuration
+          The build used these critical options:
+          \`\`\`bash
+          ./configure \
+            --prefix=/usr/local/qemu
+          \`\`\`
+
+          ### Included Artifacts
+          The tarball (`qemu-system-v10.0.3-linux-x64.tar.xz`) contains:
+          - 📁 **Binaries**: All system-mode emulators in `bin/` (e.g., `qemu-system-arm`).
+          - ✅ **Checksums**: `SHA256SUMS` for verifying binary integrity.
+
+          ### Usage Example
+          To run an ARM binary on x86_64 Linux:
+          \`\`\`bash
+          # Extract the tarball
+          tar -xJf qemu-system-v10.0.3-linux-x64.tar.xz
+          cd qemu-system-v10.0.3-linux-x64/bin
+
+          # Execute an ARM executable
+          ./qemu-system-arm ./your-arm-binary
+          \`\`\`
+
+          ### Build Details
+          - 🧑‍💻 Triggered by: @${{ github.actor }}
+          - 🆔 Run ID: ${{ github.run_id }}
+          - 📦 Environment: Ubuntu 20.04 container (root user)
+          - 🧩 Patch: ${{ env.PATCH_NAME }} (Cortex-A5 support)
+          -   commit: ${{ github.sha }}
+
+          ### Known Limitations
+          - ❌ No System Emulation: Built with `--disable-system` (use for user-mode only).
+          - 🚫 BSD User Mode: Disabled via `--disable-bsd-user`.
+          - 📈 Larger Binaries: Static linking increases file size (~20-50MB per binary).
+
+          ### Verification
+          To check the tarball integrity:
+          \`\`\`bash
+          sha256sum -c qemu-system-v10.0.3-linux-x64.sha256
+          \`\`\`
+          EOF
+
+      - name: Create tag and push
+        run: |
+          RELEASE_TAG="qemu-system-v10.0.3-${{ github.run_id }}"
+
+          # Use current HEAD commit instead
+          COMMIT_SHA=$(git rev-parse HEAD)
+
+          # Clean up possible line breaks
+          COMMIT_SHA=$(echo "$COMMIT_SHA" | tr -d '\n')
+
+          # Verify the commit exists locally
+          if ! git cat-file -e $COMMIT_SHA; then
+            echo "ERROR: Commit $COMMIT_SHA does not exist locally"
+            exit 1
+          fi
+
+          # Create and push tag if doesn't exist
+          if ! git rev-parse $RELEASE_TAG >/dev/null 2>&1; then
+            echo "Creating tag $RELEASE_TAG pointing to $COMMIT_SHA"
+            git tag $RELEASE_TAG $COMMIT_SHA
+            git push origin $RELEASE_TAG
+          fi
+
+          # Create prerelease targeting specific commit SHA
+          if ! gh release view $RELEASE_TAG >/dev/null 2>&1; then
+          # Create release (prerelease by default)
+          gh release create $RELEASE_TAG \
+            --title "QEMU User Static v10.0.3 (Build ${{ github.run_id }})" \
+            --notes-file release_notes.md \
+            --target "$COMMIT_SHA" \
+            --prerelease
+          fi
+
+          # Upload all artifacts to release
+          find all_artifacts -type f | while read file; do
+            gh release upload "$RELEASE_TAG" "$file" --clobber
+          done
