@@ -150,15 +150,19 @@ jobs:
           # Optional: Verify static linking (uncomment to enable)
           # file qemu-static/* | grep "statically linked"
 
-      # 9. Checkout current repository for release operations
-      - name: Checkout current repository
+      # 9. Checkout current repository for release operations (修复后)
+      - name: Checkout current repository for release operations
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Required for tagging
+          repository: ${{ github.repository }}
+          fetch-depth: 0
+          path: .
 
       # 10. Configure Git identity for tagging
       - name: Configure Git
         run: |
+          echo "Current path: $(pwd)"
+          git status
           # Set identity for automated commits/tags
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
