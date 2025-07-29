@@ -1,4 +1,4 @@
-name: Build Static QEMU Binaries (v10.0.3)
+name: Build System QEMU Binaries (v10.0.3)
 
 on:
   workflow_dispatch:  # Only allow manual triggering via GitHub UI
