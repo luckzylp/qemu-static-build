@@ -3,14 +3,6 @@ name: Build Static QEMU Binaries (v10.0.3)
 on:
   workflow_dispatch:  # Only allow manual triggering via GitHub UI
 
-# Centralized environment variables (avoid hardcoding)
-env:
-  QEMU_VERSION: "10.0.3"
-  PATCH_NAME: "qemu_v${{ env.QEMU_VERSION }}_patch_cortex-a5.patch"
-  ARTIFACT_BASE_NAME: "qemu-user-static-v${{ env.QEMU_VERSION }}"
-  RELEASE_TAG: "${{ env.ARTIFACT_BASE_NAME }}-${{ github.run_id }}"
-  PATCH_DIR: "qemu-patch/patches"
-
 jobs:
   build-static-qemu:
     runs-on: ubuntu-latest
@@ -74,11 +66,11 @@ jobs:
           echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       # 3. Checkout QEMU source
-      - name: Checkout QEMU v${{ env.QEMU_VERSION }}
+      - name: Checkout QEMU v10.0.3
         uses: actions/checkout@v4
         with:
           repository: qemu/qemu
-          ref: v${{ env.QEMU_VERSION }}
+          ref: v10.0.3
           path: qemu-src
 
       # 4. Checkout custom patch for ARM Cortex-A5 support
@@ -92,9 +84,13 @@ jobs:
         run: |
           cd qemu-src
           # Apply patch from repository's patches directory, clone path is ./qemu-static-build/qemu-src
-          git apply ../${{ env.PATCH_DIR }}/${{ env.PATCH_NAME }}
+          git apply ../qemu-patch/patches/qemu_v10.0.3_patch_cortex-a5.patch
         env:
-          PATCH_PATH: "../${{ env.PATCH_DIR }}/${{ env.PATCH_NAME }}"
+          PATCH_FILE: "patches/qemu_v10.0.3_patch_cortex-a5.patch"  # Patch location
+        # Optional: Add these steps for pre-application validation
+        #   - run: git apply --check $PATCH_FILE  # Test patch without applying
+        #   - name: Apply verified patch
+        #     run: git apply $PATCH_FILE
 
       # 6. Setup Python virtual environment
       - name: Setup Python venv
@@ -137,7 +133,7 @@ jobs:
       - name: Package artifacts
         run: |
           # Create output directory
-          ARTIFACT_DIR="${{ env.ARTIFACT_BASE_NAME }}-linux-x64"
+          ARTIFACT_DIR="qemu-user-static-v10.0.3-linux-x64"
           mkdir -p $ARTIFACT_DIR
           cp -rf /usr/local/qemu/* $ARTIFACT_DIR/
 
@@ -147,15 +143,12 @@ jobs:
           # Create tarball
           tar -cJf "${ARTIFACT_DIR}.tar.xz" $ARTIFACT_DIR
 
-          # Export artifact name for later steps
-          echo "ARTIFACT_FILENAME=${ARTIFACT_DIR}.tar.xz" >> $GITHUB_ENV
-
       # 10. Upload artifacts
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_BASE_NAME }}-linux-x64
-          path: ${{ env.ARTIFACT_FILENAME }}
+          name: qemu-user-static-v10.0.3-linux-x64
+          path: qemu-user-static-v10.0.3-linux-x64.tar.xz
 
   # Release creation job
   create-release:
@@ -177,7 +170,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_BASE_NAME }}-linux-x64
+          name: qemu-user-static-v10.0.3-linux-x64
           path: all_artifacts
           pattern: qemu-static-*
           merge-multiple: true
@@ -193,15 +186,15 @@ jobs:
       - name: Create release notes
         run: |
           cat > release_notes.md << EOF
-          ## QEMU User Static Binaries (v${{ env.QEMU_VERSION }}) - Build ${{ github.run_id }}
+          ## QEMU User Static Binaries v10.0.3 - Build ${{ github.run_id }}
 
           ### Overview
-          This release provides **statically linked QEMU user-mode emulation binaries** for Linux, built from QEMU v${{ env.QEMU_VERSION }}. A custom patch adds support for the **ARM Cortex-A5** processor. Static linking ensures portability across most Linux distributions.
+          This release provides **statically linked QEMU user-mode emulation binaries** for Linux, built from QEMU v10.0.3. A custom patch adds support for the **ARM Cortex-A5** processor. Static linking ensures portability across most Linux distributions.
 
           ### Key Features
           - 🚀 **Static Build**: No dynamic library dependencies (runs on any Linux system).
           - 🖥️ **User-Mode Emulation**: Enabled via `--enable-linux-user` (system emulation disabled).
-          - 🛠️ **ARM Cortex-A5 Support**: Custom patch applied (${{ env.PATCH_NAME }}).
+          - 🛠️ **ARM Cortex-A5 Support**: Custom patch applied (`qemu_v10.0.3_patch_cortex-a5.patch`).
           - 🌍 **Multi-Architecture**: Includes binaries for all supported targets (e.g., `qemu-arm`, `qemu-x86_64`).
 
           ### Build Configuration
@@ -217,7 +210,7 @@ jobs:
           \`\`\`
 
           ### Included Artifacts
-          The tarball (${{ env.ARTIFACT_FILENAME }}) contains:
+          The tarball (`qemu-user-static-v10.0.3-linux-x64.tar.xz`) contains:
           - 📁 **Binaries**: All user-mode emulators in `bin/` (e.g., `qemu-arm`).
           - ✅ **Checksums**: `SHA256SUMS` for verifying binary integrity.
 
@@ -225,8 +218,8 @@ jobs:
           To run an ARM binary on x86_64 Linux:
           \`\`\`bash
           # Extract the tarball
-          tar -xJf ${{ env.ARTIFACT_FILENAME }}
-          cd ${{ env.ARTIFACT_BASE_NAME }}-linux-x64/bin
+          tar -xJf qemu-user-static-v10.0.3-linux-x64.tar.xz
+          cd qemu-user-static-v10.0.3-linux-x64/bin
 
           # Execute an ARM executable
           ./qemu-arm ./your-arm-binary
@@ -247,13 +240,13 @@ jobs:
           ### Verification
           To check the tarball integrity:
           \`\`\`bash
-          sha256sum -c ${{ env.ARTIFACT_FILENAME }}.sha256
+          sha256sum -c qemu-user-static-v10.0.3-linux-x64.sha256
           \`\`\`
           EOF
 
       - name: Create tag and push
         run: |
-          RELEASE_TAG=${{ env.RELEASE_TAG }}
+          RELEASE_TAG="qemu-user-static-v10.0.3-${{ github.run_id }}"
 
           # Use current HEAD commit instead
           COMMIT_SHA=$(git rev-parse HEAD)
@@ -278,7 +271,7 @@ jobs:
           if ! gh release view $RELEASE_TAG >/dev/null 2>&1; then
           # Create release (prerelease by default)
           gh release create ${{ env.RELEASE_TAG }} \
-            --title "QEMU User Static v${{ env.QEMU_VERSION }} (Build ${{ github.run_id }})" \
+            --title "QEMU User Static v10.0.3 (Build ${{ github.run_id }})" \
             --notes-file release_notes.md \
             --target "$COMMIT_SHA" \
             --prerelease
