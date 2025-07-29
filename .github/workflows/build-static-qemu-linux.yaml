@@ -277,11 +277,11 @@ jobs:
           # Create prerelease targeting specific commit SHA
           if ! gh release view $RELEASE_TAG >/dev/null 2>&1; then
           # Create release (prerelease by default)
-	    gh release create ${{ env.RELEASE_TAG }} \
-	       --title "QEMU User Static v${{ env.QEMU_VERSION }} (Build ${{ github.run_id }})" \
-	       --notes-file release_notes.md \
-	       --target "$COMMIT_SHA" \
-	       --prerelease
+          gh release create ${{ env.RELEASE_TAG }} \
+            --title "QEMU User Static v${{ env.QEMU_VERSION }} (Build ${{ github.run_id }})" \
+            --notes-file release_notes.md \
+            --target "$COMMIT_SHA" \
+            --prerelease
           fi
 
           # Upload all artifacts to release
