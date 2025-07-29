@@ -43,7 +43,8 @@ jobs:
             libsasl2-dev libsdl2-dev libseccomp-dev libsnappy-dev libssh-dev\
             libvde-dev libvdeplug-dev libvte-2.91-dev libxen-dev liblzo2-dev\
             valgrind xfslibs-dev \
-            libnfs-dev libiscsi-dev
+            libnfs-dev libiscsi-dev \
+            libunistring-dev libp11-kit-dev
 
       # 1.1. Install Python 3.8 and dependencies
       - name: Install Python 3.8
