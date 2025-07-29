@@ -150,93 +150,91 @@ jobs:
           # Optional: Verify static linking (uncomment to enable)
           # file qemu-static/* | grep "statically linked"
 
-      # 9. Checkout current repository for release operations (修复后)
-      - name: Checkout current repository for release operations
+      # Step 9: Upload artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-user-static-v10.0.3-linux-x64
+          path: ./qemu-user-static-v10.0.3-linux-x64.tar.xz
+
+  # Release creation job
+  create-release:
+    needs: [build-static-qemu]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository }}
           fetch-depth: 0
-          path: .
 
-      # 10. Configure Git identity for tagging
       - name: Configure Git
         run: |
-          echo "Current path: $(pwd)"
-          git status
-          # Set identity for automated commits/tags
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      # 11. Install GitHub CLI for release management
-      - name: Install GitHub CLI
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          apt update && apt install -y gh
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all_artifacts
+          pattern: qemu-user-static-*
+          merge-multiple: true
 
-      # 12. Authenticate GitHub CLI
-      - name: Authenticate gh CLI
+      - name: Setup GitHub CLI
         run: |
-          # Use repository token for authentication
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+          sudo apt-get update
+          sudo apt-get install -y gh
 
-      # 13. Create GitHub release and upload tarball
-      - name: Create release and upload tarball
+      - name: Authenticate GitHub CLI
+        run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Create tag and push
         run: |
-          # Generate unique tag name (includes run ID for uniqueness)
-          TAG_NAME="qemu-user-static-v10.0.3-${{ github.run_id }}"
-          TARBALL_PATH="./qemu-user-static-v10.0.3-linux-x64.tar.xz"
+          RELEASE_TAG="qemu-user-static-v10.0.3-${{ github.run_id }}"
 
-          # Get current commit SHA for tagging
-          CURRENT_SHA=$(git rev-parse HEAD | tr -d '\n')
-          if [ -z "$CURRENT_SHA" ]; then
-            echo "::error::Commit SHA is empty. Cannot create release."
+          # Use current HEAD commit instead
+          COMMIT_SHA=$(git rev-parse HEAD)
+
+          # Clean up possible line breaks
+          COMMIT_SHA=$(echo "$COMMIT_SHA" | tr -d '\n')
+
+          # Verify the commit exists locally
+          if ! git cat-file -e $COMMIT_SHA; then
+            echo "ERROR: Commit $COMMIT_SHA does not exist locally"
             exit 1
           fi
 
-          # Create tag if it doesn't exist
-          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            git tag "$TAG_NAME" "$CURRENT_SHA"
-            git push origin "$TAG_NAME"
-            echo "Created tag: $TAG_NAME"
-          else
-            echo "Tag $TAG_NAME already exists. Skipping."
+          # Create and push tag if doesn't exist
+          if ! git rev-parse $RELEASE_TAG >/dev/null 2>&1; then
+            echo "Creating tag $RELEASE_TAG pointing to $COMMIT_SHA"
+            git tag $RELEASE_TAG $COMMIT_SHA
+            git push origin $RELEASE_TAG
           fi
 
-          # Generate release notes
-          {
-            echo "## QEMU User Static Binaries v10.0.3"
-            echo ""
-            echo "### Build Details"
-            echo "- **Run ID**: \`${{ github.run_id }}\`"
-            echo "- **Triggered by**: @${{ github.actor }}"
-            echo "- **Commit SHA**: \`$CURRENT_SHA\`"
-            echo "- **Environment**: Ubuntu 20.04 Container"
-            echo "- **Patch**: ARM Cortex-A5 Support"
-            echo ""
-            echo "### Artifact"
-            echo "Statically linked user-mode binaries packaged in:"
-            echo "\`$(basename "$TARBALL_PATH")\`"
-            echo ""
-            echo "### Verification"
-            echo "#### Tarball Checksum"
-            sha256sum "$TARBALL_PATH" | awk '{printf "`%s`  %s\n", $1, $2}'
-            echo ""
-            echo "#### Individual Binaries"
-            echo "SHA256 checksums for individual binaries are included inside the tarball (\`SHA256SUMS\` file)."
-          } > release_notes.md
+          # Create prerelease targeting specific commit SHA
+          if ! gh release view $RELEASE_TAG >/dev/null 2>&1; then
+            {
+              echo "## QEMU User Static Binaries v10.0.3"
+              echo ""
+              echo "### Build Details"
+              echo "- **Run ID**: \`${{ github.run_id }}\`"
+              echo "- **Triggered by**: @${{ github.actor }}"
+              echo "- **Commit SHA**: \`$CURRENT_SHA\`"
+              echo "- **Environment**: Ubuntu 20.04 Container"
+              echo "- **Patch**: ARM Cortex-A5 Support"
+              echo ""
+            } > release_notes.md
 
-          # Create release (if not exists)
-          if ! gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release create "$TAG_NAME" \
-              --title "QEMU User Static v10.0.3 (Build ${{ github.run_id }})" \
+            # Create as prerelease using the --prerelease flag
+            gh release create "$RELEASE_TAG" \
+              --title "Static libclang $VERSION" \
               --notes-file release_notes.md \
+              --target "$COMMIT_SHA" \
               --prerelease
-            echo "Created release: $TAG_NAME"
-          else
-            echo "Release $TAG_NAME already exists. Skipping creation."
           fi
 
-          # Upload tarball (overwrites if already exists)
-          echo "Uploading artifact: $TARBALL_PATH"
-          gh release upload "$TAG_NAME" "$TARBALL_PATH" --clobber
+          # Upload all artifacts to release
+          find all_artifacts -type f | while read file; do
+            gh release upload "$RELEASE_TAG" "$file" --clobber
+          done
