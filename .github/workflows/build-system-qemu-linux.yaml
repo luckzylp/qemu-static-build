@@ -113,10 +113,11 @@ jobs:
           echo "PATH=$PWD/pyvenv/bin:$PATH" >> $GITHUB_ENV
 
       # 7. Configure QEMU for static user-mode build
-      - name: Configure static build (user-mode only)
+      - name: Configure system build (system-mode only)
         run: |
           cd qemu-src
           ./configure \
+            --disable-linux-user \
             --prefix=/usr/local/qemu
 
       # 8. Compile and install QEMU
@@ -197,6 +198,7 @@ jobs:
           The build used these critical options:
           \`\`\`bash
           ./configure \
+            --disable-linux-user \
             --prefix=/usr/local/qemu
           \`\`\`
 
@@ -262,7 +264,7 @@ jobs:
           if ! gh release view $RELEASE_TAG >/dev/null 2>&1; then
           # Create release (prerelease by default)
           gh release create $RELEASE_TAG \
-            --title "QEMU User Static v10.0.3 (Build ${{ github.run_id }})" \
+            --title "QEMU System mode v10.0.3 (Build ${{ github.run_id }})" \
             --notes-file release_notes.md \
             --target "$COMMIT_SHA" \
             --prerelease
