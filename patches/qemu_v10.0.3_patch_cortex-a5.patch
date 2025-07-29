@@ -3,9 +3,9 @@ index 6a719b9586..6b4093e100 100644
 --- a/docs/system/arm/virt.rst
 +++ b/docs/system/arm/virt.rst
 @@ -60,6 +60,7 @@ TrustZone emulation is not enabled.
- 
+
  Supported guest CPU types:
- 
+
 +- ``cortex-a5`` (32-bit)
  - ``cortex-a7`` (32-bit)
  - ``cortex-a15`` (32-bit; the default)
@@ -29,7 +29,7 @@ index 2c45b7eddd..392d861d06 100644
 @@ -380,6 +380,42 @@ static void cortex_a8_initfn(Object *obj)
      define_arm_cp_regs(cpu, cortexa8_cp_reginfo);
  }
- 
+
 +static void cortex_a5_initfn(Object *obj)
 +{
 +    ARMCPU *cpu = ARM_CPU(obj);
@@ -73,7 +73,7 @@ index 2c45b7eddd..392d861d06 100644
      { .name = "arm1136",     .initfn = arm1136_initfn },
      { .name = "arm1176",     .initfn = arm1176_initfn },
      { .name = "arm11mpcore", .initfn = arm11mpcore_initfn },
-+    { .name = "cortext-a5",  .initfn = cortex_a5_initfn },
++    { .name = "cortex-a5",   .initfn = cortex_a5_initfn },
      { .name = "cortex-a7",   .initfn = cortex_a7_initfn },
      { .name = "cortex-a8",   .initfn = cortex_a8_initfn },
      { .name = "cortex-a9",   .initfn = cortex_a9_initfn },

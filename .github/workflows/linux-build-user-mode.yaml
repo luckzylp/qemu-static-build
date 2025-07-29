@@ -145,10 +145,11 @@ jobs:
           )
 
           # Create tarball (contains qemu-static/ directory with all files)
-          tar -cJf qemu-user-static-v10.0.3-linux-x64.tar.xz qemu-static
+          mv qemu-static qemu-static-v10.0.3
+          tar -cJf qemu-user-static-v10.0.3-linux-x64.tar.xz qemu-static-v10.0.3
 
           # Optional: Verify static linking (uncomment to enable)
-          # file qemu-static/* | grep "statically linked"
+          # file qemu-static-v10.0.3/* | grep "statically linked"
 
       # Step 9: Upload artifacts
       - name: Upload build artifacts
@@ -220,7 +221,6 @@ jobs:
               echo "### Build Details"
               echo "- **Run ID**: \`${{ github.run_id }}\`"
               echo "- **Triggered by**: @${{ github.actor }}"
-              echo "- **Commit SHA**: \`$CURRENT_SHA\`"
               echo "- **Environment**: Ubuntu 20.04 Container"
               echo "- **Patch**: ARM Cortex-A5 Support"
               echo ""
