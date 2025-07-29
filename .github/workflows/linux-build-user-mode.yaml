@@ -228,7 +228,7 @@ jobs:
 
             # Create as prerelease using the --prerelease flag
             gh release create "$RELEASE_TAG" \
-              --title "Static libclang $VERSION" \
+              --title "qemu-user-static-v10.0.3 \
               --notes-file release_notes.md \
               --target "$COMMIT_SHA" \
               --prerelease
