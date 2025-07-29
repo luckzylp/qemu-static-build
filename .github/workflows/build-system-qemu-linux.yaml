@@ -112,7 +112,7 @@ jobs:
           echo "VIRTUAL_ENV=$PWD/pyvenv" >> $GITHUB_ENV
           echo "PATH=$PWD/pyvenv/bin:$PATH" >> $GITHUB_ENV
 
-      # 7. Configure QEMU for static user-mode build
+      # 7. Configure QEMU for system-mode build
       - name: Configure system build (system-mode only)
         run: |
           cd qemu-src
@@ -185,10 +185,10 @@ jobs:
       - name: Create release notes
         run: |
           cat > release_notes.md << EOF
-          ## QEMU User Static Binaries v10.0.3 - Build ${{ github.run_id }}
+          ## QEMU System-mode Binaries v10.0.3 - Build ${{ github.run_id }}
 
           ### Overview
-          This release provides **statically linked QEMU user-mode emulation binaries** for Linux, built from QEMU v10.0.3. A custom patch adds support for the **ARM Cortex-A5** processor. Static linking ensures portability across most Linux distributions.
+          This release provides **QEMU system-mode emulation binaries** for Linux, built from QEMU v10.0.3. A custom patch adds support for the **ARM Cortex-A5** processor. Static linking ensures portability across most Linux distributions.
 
           ### Key Features
           - 🛠️ **ARM Cortex-A5 Support**: Custom patch applied (`qemu_v10.0.3_patch_cortex-a5.patch`).
@@ -224,11 +224,6 @@ jobs:
           - 📦 Environment: Ubuntu 20.04 container (root user)
           - 🧩 Patch: ${{ env.PATCH_NAME }} (Cortex-A5 support)
           -   commit: ${{ github.sha }}
-
-          ### Known Limitations
-          - ❌ No System Emulation: Built with `--disable-system` (use for user-mode only).
-          - 🚫 BSD User Mode: Disabled via `--disable-bsd-user`.
-          - 📈 Larger Binaries: Static linking increases file size (~20-50MB per binary).
 
           ### Verification
           To check the tarball integrity:
