@@ -40,25 +40,13 @@ jobs:
             libsasl2-dev libsdl2-dev libseccomp-dev libsnappy-dev libssh-dev \
             libvde-dev libvdeplug-dev libvte-2.91-dev libxen-dev liblzo2-dev \
             valgrind xfslibs-dev  \
-            libnfs-dev libiscsi-dev
+            libnfs-dev libiscsi-dev \
+            libglib2.0-dev
 
           # upgrade python3 setuptools
           sudo pip3 install --upgrade setuptools
 
-      # 2. Build static GLib (dependency for QEMU)
-      - name: Build static GLib (2.9.6)
-        run: |
-          #  Download glib-2.9.6 source code
-          wget https://download.gnome.org/sources/glib/2.9/glib-2.9.6.tar.bz2
-          tar -xf glib-2.9.6.tar.bz2
-          cd glib-2.9.6
-          ./configure --prefix=/usr/local --enable-static --disable-shared
-          make -j$(nproc)
-          sudo make install
-          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
-          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-      # 3. Checkout QEMU source
+      # 4. Checkout QEMU source
       - name: Checkout QEMU v10.0.3
         uses: actions/checkout@v4
         with:
@@ -66,13 +54,13 @@ jobs:
           ref: v10.0.3
           path: qemu-src
 
-      # 4. Checkout custom patch for ARM Cortex-A5 support
+      # 5. Checkout custom patch for ARM Cortex-A5 support
       - name: Checkout QEMU patch repository
         uses: actions/checkout@v4
         with:
           path: qemu-patch  # Directory for patch files
 
-      # 5. Apply Cortex-A5 patch to QEMU source
+      # 6. Apply Cortex-A5 patch to QEMU source
       - name: Apply ARM Cortex-A5 support patch
         run: |
           cd qemu-src
@@ -85,7 +73,7 @@ jobs:
         #   - name: Apply verified patch
         #     run: git apply $PATCH_FILE
 
-      # 6. Setup Python virtual environment
+      # 7. Setup Python virtual environment
       - name: Setup Python venv
         run: |
           cd qemu-src
@@ -96,7 +84,7 @@ jobs:
           echo "VIRTUAL_ENV=$PWD/pyvenv" >> $GITHUB_ENV
           echo "PATH=$PWD/pyvenv/bin:$PATH" >> $GITHUB_ENV
 
-      # 7. Configure QEMU for system-mode build
+      # 8. Configure QEMU for system-mode build
       - name: Configure system build (system-mode only)
         run: |
           cd qemu-src
@@ -104,7 +92,7 @@ jobs:
             --disable-linux-user \
             --prefix=/usr/local/qemu
 
-      # 8. Compile and install QEMU
+      # 9. Compile and install QEMU
       - name: Compile QEMU
         run: |
           cd qemu-src
@@ -112,7 +100,7 @@ jobs:
           make -j$(nproc)
           sudo make install
 
-      # 9. Prepare artifacts (using versioned names)
+      # 10. Prepare artifacts (using versioned names)
       - name: Package artifacts
         run: |
           # Create output directory
@@ -126,7 +114,7 @@ jobs:
           # Create tarball
           tar -cJf "${ARTIFACT_DIR}.tar.xz" $ARTIFACT_DIR
 
-      # 10. Upload artifacts
+      # 11. Upload artifacts
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
