@@ -52,20 +52,9 @@ jobs:
           wget https://download.gnome.org/sources/glib/2.9/glib-2.9.6.tar.bz2
           tar -xf glib-2.9.6.tar.bz2
           cd glib-2.9.6
-          mkdir -p _build
-          meson setup _build \
-            --prefix=/usr/local \
-            --buildtype=release \
-            --default-library=static \
-            -Dinternal_pcre=true \
-            -Dselinux=disabled \
-            -Dlibmount=disabled \
-            -Dman=false \
-            -Dgtk_doc=false \
-            -Dnls=disabled
-
-          ninja -C _build
-          sudo ninja -C _build install
+          ./configure --prefix=/usr/local --enable-static --disable-shared
+          make -j$(nproc)
+          sudo make install
           export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
           echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
