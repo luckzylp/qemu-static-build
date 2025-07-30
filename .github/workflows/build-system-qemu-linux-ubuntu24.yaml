@@ -1,4 +1,4 @@
-name: Build System QEMU(v10.0.3) for ubuntu20.04
+name: Build System QEMU(v10.0.3) for ubuntu24.04
 
 on:
   workflow_dispatch:  # Only allow manual triggering via GitHub UI
@@ -6,9 +6,6 @@ on:
 jobs:
   build-system-qemu:
     runs-on: ubuntu-latest
-    container:
-      image: ubuntu:20.04  # Specific OS version for build consistency
-      options: --user root  # Run as root for package installation
 
     permissions:
       contents: write  # Required for creating tags/releases
@@ -21,9 +18,9 @@ jobs:
       # 1. Install build dependencies
       - name: Install build dependencies
         run: |
-          apt-get update
+          sudo apt-get update
           export DEBIAN_FRONTEND=noninteractive
-          apt-get install -y \
+          sudo apt-get install -y \
             git build-essential ninja-build \
             pkg-config libpixman-1-dev \
             zlib1g-dev libfdt-dev libslirp-dev \
@@ -47,7 +44,7 @@ jobs:
             libnfs-dev libiscsi-dev
 
           # upgrade python3 setuptools
-          pip3 install --upgrade setuptools
+          sudo pip3 install --upgrade setuptools
 
       # 2. Build static GLib (dependency for QEMU)
       - name: Build static GLib (2.66.0)
@@ -70,7 +67,7 @@ jobs:
             -Dnls=disabled
 
           ninja -C _build
-          ninja -C _build install
+          sudo ninja -C _build install
           export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
           echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
@@ -126,13 +123,13 @@ jobs:
           cd qemu-src
           # Parallel build using all available CPU cores
           make -j$(nproc)
-          make install
+          sudo make install
 
       # 9. Prepare artifacts (using versioned names)
       - name: Package artifacts
         run: |
           # Create output directory
-          ARTIFACT_DIR="qemu-system-v10.0.3-linux-x64"
+          ARTIFACT_DIR="qemu-system-v10.0.3-ubuntu24.04-x64"
           mkdir -p $ARTIFACT_DIR
           cp -rf /usr/local/qemu/* $ARTIFACT_DIR/
 
@@ -146,8 +143,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: qemu-system-v10.0.3-linux-x64
-          path: qemu-system-v10.0.3-linux-x64.tar.xz
+          name: qemu-system-v10.0.3-ubuntu24.04-x64
+          path: qemu-system-v10.0.3-ubuntu24.04-x64.tar.xz
 
   # Release creation job
   create-release:
@@ -169,7 +166,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: qemu-system-v10.0.3-linux-x64
+          name: qemu-system-v10.0.3-ubuntu24.04-x64
           path: all_artifacts
           pattern: qemu-*
           merge-multiple: true
@@ -188,7 +185,7 @@ jobs:
           ## QEMU System-mode Binaries v10.0.3 - Build ${{ github.run_id }}
 
           ### Overview
-          This release provides **QEMU system-mode emulation binaries** for Linux, built from QEMU v10.0.3. A custom patch adds support for the **ARM Cortex-A5** processor. Static linking ensures portability across most Linux distributions.
+          This release provides **QEMU system-mode emulation binaries** for ubuntu24.04, built from QEMU v10.0.3. A custom patch adds support for the **ARM Cortex-A5** processor. Static linking ensures portability across most Linux distributions.
 
           ### Key Features
           - 🛠️ **ARM Cortex-A5 Support**: Custom patch applied (`qemu_v10.0.3_patch_cortex-a5.patch`).
@@ -208,11 +205,11 @@ jobs:
           - ✅ **Checksums**: `SHA256SUMS` for verifying binary integrity.
 
           ### Usage Example
-          To run an ARM binary on x86_64 Linux:
+          To run an ARM binary on x86_64 ubuntu24.04:
           \`\`\`bash
           # Extract the tarball
-          tar -xJf qemu-system-v10.0.3-linux-x64.tar.xz
-          cd qemu-system-v10.0.3-linux-x64/bin
+          tar -xJf qemu-system-v10.0.3-ubuntu24.04-x64.tar.xz
+          cd qemu-system-v10.0.3-ubuntu24.04-x64/bin
 
           # Execute an ARM executable
           ./qemu-system-arm ./your-arm-binary
@@ -228,13 +225,13 @@ jobs:
           ### Verification
           To check the tarball integrity:
           \`\`\`bash
-          sha256sum -c qemu-system-v10.0.3-linux-x64.sha256
+          sha256sum -c qemu-system-v10.0.3-ubuntu24.04-x64.sha256
           \`\`\`
           EOF
 
       - name: Create tag and push
         run: |
-          RELEASE_TAG="qemu-system-v10.0.3-${{ github.run_id }}"
+          RELEASE_TAG="qemu-system-v10.0.3-ubuntu24.04-${{ github.run_id }}"
 
           # Use current HEAD commit instead
           COMMIT_SHA=$(git rev-parse HEAD)
