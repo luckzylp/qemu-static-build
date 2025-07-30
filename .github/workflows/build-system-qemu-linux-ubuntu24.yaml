@@ -46,12 +46,12 @@ jobs:
           sudo pip3 install --upgrade setuptools
 
       # 2. Build static GLib (dependency for QEMU)
-      - name: Build static GLib (2.66.0)
+      - name: Build static GLib (2.9.6)
         run: |
-          #  Download glib-2.66.0 source code
-          wget https://download.gnome.org/sources/glib/2.66/glib-2.66.0.tar.xz
-          tar -xf glib-2.66.0.tar.xz
-          cd glib-2.66.0
+          #  Download glib-2.9.6 source code
+          wget https://download.gnome.org/sources/glib/2.9/glib-2.9.6.tar.bz2
+          tar -xf glib-2.9.6.tar.bz2
+          cd glib-2.9.6
           mkdir -p _build
           meson setup _build \
             --prefix=/usr/local \
@@ -61,7 +61,6 @@ jobs:
             -Dselinux=disabled \
             -Dlibmount=disabled \
             -Dman=false \
-            -Dtests=false \
             -Dgtk_doc=false \
             -Dnls=disabled
 
