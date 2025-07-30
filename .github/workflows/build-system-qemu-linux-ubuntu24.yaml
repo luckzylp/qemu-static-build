@@ -193,7 +193,7 @@ jobs:
           ### Build Details
           - 🧑‍💻 Triggered by: @${{ github.actor }}
           - 🆔 Run ID: ${{ github.run_id }}
-          - 📦 Environment: Ubuntu 20.04 container (root user)
+          - 📦 Environment: Ubuntu 24.04
           - 🧩 Patch: ${{ env.PATCH_NAME }} (Cortex-A5 support)
           -   commit: ${{ github.sha }}
 
